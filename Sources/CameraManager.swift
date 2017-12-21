@@ -1894,11 +1894,7 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
         if let validCaptureSession = captureSession {
             var sessionPreset = newCameraOutputQuality
             if newCameraOutputQuality == .high {
-                if cameraOutputMode == .stillImage {
-                    sessionPreset = AVCaptureSession.Preset.photo
-                } else {
-                    sessionPreset = AVCaptureSession.Preset.high
-                }
+                sessionPreset = AVCaptureSession.Preset.high
             }
             
             if validCaptureSession.canSetSessionPreset(sessionPreset) {
