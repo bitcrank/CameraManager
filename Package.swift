@@ -6,7 +6,10 @@ import PackageDescription
 
 let package = Package(
   name: "CameraManager",
+  products: [
+    .library(name: "CameraManager", targets: ["CameraManager"]),
+  ],
   targets: [
-        Target(name: "camera", dependencies: [.Target(name: "CameraManager")])
-    ]
+    .target(name: "CameraManager", path: "camera", sources: ["CameraManager.swift"])
+  ]
 )
