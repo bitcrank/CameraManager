@@ -1,3 +1,4 @@
+// swift-tools-version:4.0
 // Package.swift
 //
 // Copyright © 2017 ImaginaryCloud, imaginarycloud.com. This library is licensed under the MIT license.
