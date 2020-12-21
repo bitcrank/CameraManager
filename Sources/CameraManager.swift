@@ -260,7 +260,7 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
                 _updateCameraDevice(cameraDevice)
                 _updateIlluminationMode(flashMode)
                 _setupMaxZoomScale()
-                _zoom(0)
+                _zoom(naturalZoomScale)
                 _orientationChanged()
             }
         }
@@ -292,7 +292,7 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
                     _setupOutputMode(cameraOutputMode, oldCameraOutputMode: oldValue)
                 }
                 _setupMaxZoomScale()
-                _zoom(0)
+                _zoom(naturalZoomScale)
             }
         }
     }
@@ -363,8 +363,9 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
     fileprivate var cameraIsSetup = false
     fileprivate var cameraIsObservingDeviceOrientation = false
     
-    fileprivate var zoomScale = CGFloat(1.0)
+	fileprivate var zoomScale = CGFloat(1.0)
     fileprivate var beginZoomScale = CGFloat(1.0)
+	fileprivate var naturalZoomScale = CGFloat(1.0)
     fileprivate var maxZoomScale = CGFloat(1.0)
     
     fileprivate func _tempFilePath() -> URL {
@@ -968,15 +969,14 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
         }
         
         do {
-            let captureDevice = device
-            try captureDevice?.lockForConfiguration()
-            
-            zoomScale = max(1.0, min(beginZoomScale * scale, maxZoomScale))
-            
-            captureDevice?.videoZoomFactor = zoomScale
-            
-            captureDevice?.unlockForConfiguration()
-            
+			zoomScale = max(1.0, min(beginZoomScale * scale, maxZoomScale))
+			
+			let captureDevice = device
+			if captureDevice?.videoZoomFactor != zoomScale {
+				try captureDevice?.lockForConfiguration()
+				captureDevice?.videoZoomFactor = zoomScale
+				captureDevice?.unlockForConfiguration()
+			}
         } catch {
             print("Error locking configuration")
         }
@@ -1542,11 +1542,19 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
     fileprivate func _setupMaxZoomScale() {
         var maxZoom = CGFloat(1.0)
         beginZoomScale = CGFloat(1.0)
-        
+		        
         if cameraDevice == .back, let backCameraDevice = backCameraDevice {
             maxZoom = backCameraDevice.activeFormat.videoMaxZoomFactor
+			
+			if #available(iOS 13.0, *), backCameraDevice.isVirtualDevice, let zoomFactor = backCameraDevice.virtualDeviceSwitchOverVideoZoomFactors.first {
+				naturalZoomScale = CGFloat(zoomFactor.floatValue)
+			}
         } else if cameraDevice == .front, let frontCameraDevice = frontCameraDevice {
             maxZoom = frontCameraDevice.activeFormat.videoMaxZoomFactor
+			
+			if #available(iOS 13.0, *), frontCameraDevice.isVirtualDevice, let zoomFactor = frontCameraDevice.virtualDeviceSwitchOverVideoZoomFactors.first {
+				naturalZoomScale = CGFloat(zoomFactor.floatValue)
+			}
         }
         
         maxZoomScale = maxZoom
@@ -1633,7 +1641,6 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
     fileprivate func _setupPreviewLayer() {
         if let validCaptureSession = captureSession {
             previewLayer = AVCaptureVideoPreviewLayer(session: validCaptureSession)
-            previewLayer?.videoGravity = AVLayerVideoGravity.resizeAspectFill
         }
     }
     
@@ -1946,8 +1953,19 @@ open class CameraManager: NSObject, AVCaptureFileOutputRecordingDelegate, UIGest
 }
 
 private extension AVCaptureDevice {
+	static var prioritisedDeviceTypes: [AVCaptureDevice.DeviceType] {
+		var deviceTypes: [AVCaptureDevice.DeviceType] = [.builtInWideAngleCamera]
+		if #available(iOS 10.2, *) {
+			deviceTypes.insert(.builtInDualCamera, at: 0)
+		}
+		if #available(iOS 13.0, *) {
+			deviceTypes.insert(.builtInTripleCamera, at: 0)
+		}
+		return deviceTypes
+	}
+	
     static var videoDevices: [AVCaptureDevice] {
-        return AVCaptureDevice.devices(for: AVMediaType.video)
+		return AVCaptureDevice.DiscoverySession(deviceTypes: prioritisedDeviceTypes, mediaType: .video, position: .unspecified).devices
     }
 }
 
